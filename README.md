@@ -44,4 +44,15 @@ Recommended hosts:
 - Railway.app: quick deploy with GitHub integration.
 - Fly.io: good for global deployment using the provided Dockerfile.
 
-I can deploy directly to one of these platforms if you give me access or provide the account details.
+Automatic Render deployment:
+
+- This repo includes `render.yaml` — if you connect the repository to Render, Render will detect the manifest and create a web service that builds the Docker image and deploys from the `main` branch.
+
+To deploy on Render:
+
+1. Sign in to https://render.com and click "New +" → "Web Service" → "Connect a repository" and select this repo.
+2. Ensure the branch is `main` and that the Dockerfile is selected (Render will use `render.yaml` if present).
+3. Set environment variables (`ADMIN_USER`, `ADMIN_PASS`, optional SMTP vars) in Render's dashboard under the Service → Environment.
+4. Click "Create Web Service" — Render will build and deploy. Subsequent pushes to `main` will auto-deploy.
+
+If you prefer, I can initiate the deploy for you if you provide a Render API key (set as `RENDER_API_KEY`) and the GitHub repo is connected to your Render account. Do not paste secrets into this chat; instead, if you want me to deploy, follow Render's instructions to create an API key and then paste it when prompted.
