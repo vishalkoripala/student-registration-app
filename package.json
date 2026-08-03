@@ -23,6 +23,7 @@
     "body-parser": "^2.3.0",
     "express": "^5.2.1",
     "multer": "^2.2.0",
-    "nodemailer": "^6.9.4"
+    "nodemailer": "^6.9.4",
+    "bcryptjs": "^2.4.3"
   }
 }

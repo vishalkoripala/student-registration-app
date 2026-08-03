@@ -22,3 +22,9 @@ Set environment variables before `npm start`:
 - `FROM_EMAIL` (optional)
 
 Submissions are saved to `submissions.json` in the project root.
+
+Admin page:
+
+- Visit `/admin` to see saved submissions. If `ADMIN_USER` and `ADMIN_PASS` environment variables are set, the page will require HTTP Basic auth with those credentials.
+
+Passwords are hashed with `bcryptjs` before being saved; the hash is stored in `submissions.json` under the `passwordHash` key.

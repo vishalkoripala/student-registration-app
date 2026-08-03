@@ -21,6 +21,7 @@ try {
 } catch (e) {
   nodemailer = null;
 }
+const bcrypt = require('bcryptjs');
 
 function escapeHtml(value) {
   if (!value) return "";
@@ -97,6 +98,15 @@ app.post("/submit", upload.single("profilePic"), async (req, res) => {
     : req.body.hobbies
     ? [req.body.hobbies]
     : [];
+  // Hash password before saving
+  let hashedPassword = null;
+  try {
+    if (req.body.password) {
+      hashedPassword = await bcrypt.hash(req.body.password, 10);
+    }
+  } catch (e) {
+    console.error('Password hashing failed', e);
+  }
 
   const submission = {
     id: Date.now(),
@@ -109,6 +119,7 @@ app.post("/submit", upload.single("profilePic"), async (req, res) => {
     department: req.body.department || '',
     address: req.body.address || '',
     hobbies: hobbies,
+    passwordHash: hashedPassword,
     profilePic: req.file ? req.file.filename : null,
     createdAt: new Date().toISOString()
   };
@@ -189,6 +200,60 @@ app.post("/submit", upload.single("profilePic"), async (req, res) => {
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// Simple admin protection: require ADMIN_USER and ADMIN_PASS env vars to enable basic auth
+function adminAuth(req, res, next) {
+  const adminUser = process.env.ADMIN_USER;
+  const adminPass = process.env.ADMIN_PASS;
+  if (!adminUser || !adminPass) return next(); // no auth configured
+
+  const auth = req.headers.authorization;
+  if (!auth) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
+    return res.status(401).send('Authentication required');
+  }
+  const parts = auth.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Basic') return res.status(400).send('Bad auth');
+  const buff = Buffer.from(parts[1], 'base64');
+  const [user, pass] = buff.toString().split(':');
+  if (user === adminUser && pass === adminPass) return next();
+  res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
+  return res.status(403).send('Forbidden');
+}
+
+app.get('/admin', adminAuth, async (req, res) => {
+  const file = path.join(__dirname, 'submissions.json');
+  try {
+    const raw = await fsPromises.readFile(file, 'utf8');
+    const list = JSON.parse(raw || '[]');
+    const rows = list.map(s => `
+      <tr>
+        <td>${escapeHtml(String(s.id))}</td>
+        <td>${escapeHtml(s.fullname || '')}</td>
+        <td>${escapeHtml(s.email || '')}</td>
+        <td>${escapeHtml(String(s.age || ''))}</td>
+        <td>${escapeHtml(s.gender || '')}</td>
+        <td>${escapeHtml(s.department || '')}</td>
+        <td>${escapeHtml((s.hobbies || []).join(', '))}</td>
+        <td>${s.profilePic ? `<a href="/uploads/${escapeHtml(s.profilePic)}" target="_blank">view</a>` : '—'}</td>
+        <td>${escapeHtml(s.createdAt || '')}</td>
+      </tr>
+    `).join('');
+
+    res.send(`
+      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 20px auto;">
+        <h2>Submissions</h2>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width:100%;">
+          <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Age</th><th>Gender</th><th>Department</th><th>Hobbies</th><th>Picture</th><th>Created</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="margin-top:12px; font-size:12px; color:#666;">Password hashes are stored but not displayed.</p>
+      </div>
+    `);
+  } catch (e) {
+    return res.status(500).send('Failed to read submissions');
+  }
 });
 
 app.listen(PORT, () => {
