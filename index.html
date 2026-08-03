@@ -77,7 +77,7 @@
 <body>
   <div class="container">
     <h2>Student Registration Form</h2>
-    <form id="registrationForm" method="POST" action="http://localhost:3000/submit">
+    <form id="registrationForm" method="POST" action="/submit" enctype="multipart/form-data">
       
       <!-- Name -->
       <label for="fullname">Full Name</label>
@@ -138,6 +138,10 @@
       <!-- File Upload -->
       <label for="profilePic">Upload Profile Picture</label>
       <input type="file" id="profilePic" name="profilePic" accept="image/*">
+      <div id="previewContainer" style="margin-bottom:12px; display:none;">
+        <label>Preview</label>
+        <img id="previewImg" src="" alt="Preview" style="max-width:140px; display:block; border-radius:8px; margin-top:6px;" />
+      </div>
 
       <!-- Submit -->
       <button type="submit">Register</button>

@@ -1,0 +1,28 @@
+{
+  "name": "mini-application-using-express-and-node",
+  "version": "1.0.0",
+  "description": "",
+  "main": "seerver.js",
+  "scripts": {
+    "start": "node seerver.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vishalkoripala/mini-application-using-express-and-node-js.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/vishalkoripala/mini-application-using-express-and-node-js/issues"
+  },
+  "homepage": "https://github.com/vishalkoripala/mini-application-using-express-and-node-js#readme",
+  "dependencies": {
+    "body-parser": "^2.3.0",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "nodemailer": "^6.9.4"
+  }
+}

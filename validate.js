@@ -1,53 +1,68 @@
-document.getElementById("registrationForm").addEventListener("submit", function (event) {
+function showError(id, show) {
+  document.getElementById(id).style.display = show ? 'block' : 'none';
+}
+
+function validateForm() {
   let valid = true;
-
-  // Full name validation
   const name = document.getElementById("fullname").value.trim();
-  if (name.length < 3) {
-    document.getElementById("nameError").style.display = "block";
-    valid = false;
-  } else {
-    document.getElementById("nameError").style.display = "none";
-  }
+  showError('nameError', name.length < 3);
+  if (name.length < 3) valid = false;
 
-  // Email validation
   const email = document.getElementById("email").value;
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailPattern.test(email)) {
-    document.getElementById("emailError").style.display = "block";
-    valid = false;
-  } else {
-    document.getElementById("emailError").style.display = "none";
-  }
+  showError('emailError', !emailPattern.test(email));
+  if (!emailPattern.test(email)) valid = false;
 
-  // Password validation
   const password = document.getElementById("password").value;
-  if (password.length < 6) {
-    document.getElementById("passwordError").style.display = "block";
-    valid = false;
-  } else {
-    document.getElementById("passwordError").style.display = "none";
-  }
+  showError('passwordError', password.length < 6);
+  if (password.length < 6) valid = false;
 
-  // Age validation
-  const age = document.getElementById("age").value;
-  if (age < 10 || age > 100) {
-    document.getElementById("ageError").style.display = "block";
-    valid = false;
-  } else {
-    document.getElementById("ageError").style.display = "none";
-  }
+  const age = Number(document.getElementById("age").value);
+  showError('ageError', Number.isNaN(age) || age < 10 || age > 100);
+  if (Number.isNaN(age) || age < 10 || age > 100) valid = false;
 
-  // Phone validation
   const phone = document.getElementById("phone").value;
-  if (!/^[0-9]{10}$/.test(phone)) {
-    document.getElementById("phoneError").style.display = "block";
-    valid = false;
-  } else {
-    document.getElementById("phoneError").style.display = "none";
-  }
+  showError('phoneError', !/^[0-9]{10}$/.test(phone));
+  if (!/^[0-9]{10}$/.test(phone)) valid = false;
 
-  if (!valid) {
-    event.preventDefault(); // Prevent form submission
+  const dept = document.getElementById('department').value;
+  if (!dept) valid = false;
+
+  const gender = document.querySelector('input[name="gender"]:checked');
+  if (!gender) valid = false;
+
+  const dob = document.getElementById('dob').value;
+  if (!dob) valid = false;
+
+  return valid;
+}
+
+document.getElementById("registrationForm").addEventListener("submit", function (event) {
+  if (!validateForm()) {
+    event.preventDefault();
   }
+});
+
+// Image preview
+const fileInput = document.getElementById('profilePic');
+const previewContainer = document.getElementById('previewContainer');
+const previewImg = document.getElementById('previewImg');
+fileInput.addEventListener('change', function () {
+  const file = this.files && this.files[0];
+  if (!file) {
+    previewContainer.style.display = 'none';
+    previewImg.src = '';
+    return;
+  }
+  if (!file.type.startsWith('image/')) {
+    previewContainer.style.display = 'none';
+    previewImg.src = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    previewImg.src = e.target.result;
+    previewContainer.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
 });
