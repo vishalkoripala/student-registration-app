@@ -7,4 +7,4 @@ RUN addgroup -S app && adduser -S app -G app
 USER app
 ENV PORT=3000
 EXPOSE 3000
-CMD ["node", "seerver.js"]
+CMD ["node", "server.js"]

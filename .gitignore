@@ -2,5 +2,12 @@ node_modules/
 .env
 uploads/
 submissions.json
+*.log
+npm-debug.log*
+dist/
+.DS_Storenode_modules/
+.env
+uploads/
+submissions.json
 .DS_Store
 npm-debug.log
