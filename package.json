@@ -1,5 +1,5 @@
 {
-  "name": "mini-application-using-express-and-node",
+  "name": "student-registration-app",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
