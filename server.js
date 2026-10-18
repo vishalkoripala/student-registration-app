@@ -2,26 +2,51 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const helmet = require("helmet");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const uploadDir = path.join(__dirname, "uploads");
 fs.mkdirSync(uploadDir, { recursive: true });
 
-// Middleware
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname)));
-app.use("/uploads", express.static(uploadDir));
+// Security headers and baseline hardening
+app.disable("x-powered-by");
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "same-origin" },
+  })
+);
 
-const upload = multer({ dest: uploadDir });
+// Middleware
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+app.use(express.json({ limit: "1mb" }));
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (!allowedTypes.has(file.mimetype)) {
+    return cb(new Error("Only JPEG, PNG, and WEBP image uploads are allowed."));
+  }
+  cb(null, true);
+};
+
+const upload = multer({
+  dest: uploadDir,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+    files: 1,
+  },
+  fileFilter,
+});
+
 const fsPromises = fs.promises;
 let nodemailer;
 try {
-  nodemailer = require('nodemailer');
+  nodemailer = require("nodemailer");
 } catch (e) {
   nodemailer = null;
 }
-const bcrypt = require('bcryptjs');
+const bcrypt = require("bcryptjs");
 
 function escapeHtml(value) {
   if (!value) return "";
@@ -73,6 +98,16 @@ function validateForm(data) {
   return errors;
 }
 
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    return res.status(400).send(`Upload error: ${error.message}`);
+  }
+  if (error && error.message && /Only JPEG, PNG, and WEBP image uploads are allowed/.test(error.message)) {
+    return res.status(400).send(error.message);
+  }
+  next(error);
+});
+
 app.post("/submit", upload.single("profilePic"), async (req, res) => {
   const errors = validateForm(req.body);
   if (errors.length > 0) {
@@ -86,58 +121,53 @@ app.post("/submit", upload.single("profilePic"), async (req, res) => {
     `);
   }
 
-  console.log("Form Data Received:");
-  console.log(req.body);
-
-  if (req.file) {
-    console.log("Uploaded File:", req.file.originalname);
-  }
-
   const hobbies = Array.isArray(req.body.hobbies)
     ? req.body.hobbies
     : req.body.hobbies
     ? [req.body.hobbies]
     : [];
-  // Hash password before saving
+
   let hashedPassword = null;
   try {
     if (req.body.password) {
       hashedPassword = await bcrypt.hash(req.body.password, 10);
     }
   } catch (e) {
-    console.error('Password hashing failed', e);
+    console.error("Password hashing failed", e);
+    return res.status(500).send("Failed to process registration.");
   }
 
   const submission = {
     id: Date.now(),
-    fullname: req.body.fullname || '',
-    email: req.body.email || '',
-    age: req.body.age || '',
-    gender: req.body.gender || '',
-    dob: req.body.dob || '',
-    phone: req.body.phone || '',
-    department: req.body.department || '',
-    address: req.body.address || '',
+    fullname: req.body.fullname || "",
+    email: req.body.email || "",
+    age: req.body.age || "",
+    gender: req.body.gender || "",
+    dob: req.body.dob || "",
+    phone: req.body.phone || "",
+    department: req.body.department || "",
+    address: req.body.address || "",
     hobbies: hobbies,
     passwordHash: hashedPassword,
     profilePic: req.file ? req.file.filename : null,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
 
   async function saveSubmission(obj) {
-    const file = path.join(__dirname, 'submissions.json');
+    const file = path.join(__dirname, "submissions.json");
     try {
       let list = [];
       try {
-        const raw = await fsPromises.readFile(file, 'utf8');
-        list = JSON.parse(raw || '[]');
+        const raw = await fsPromises.readFile(file, "utf8");
+        list = JSON.parse(raw || "[]");
       } catch (e) {
         list = [];
       }
       list.push(obj);
-      await fsPromises.writeFile(file, JSON.stringify(list, null, 2), 'utf8');
+      await fsPromises.writeFile(file, JSON.stringify(list, null, 2), "utf8");
     } catch (err) {
-      console.error('Failed to save submission:', err);
+      console.error("Failed to save submission:", err);
+      throw err;
     }
   }
 
@@ -154,27 +184,31 @@ app.post("/submit", upload.single("profilePic"), async (req, res) => {
         host,
         port: Number(port),
         secure: Number(port) === 465,
-        auth: { user, pass }
+        auth: { user, pass },
       });
       await transporter.sendMail({
         from,
         to,
-        subject: 'Registration Confirmation',
-        html: `<p>Hi ${escapeHtml(name)},</p><p>Thanks for registering.</p>`
+        subject: "Registration Confirmation",
+        html: `<p>Hi ${escapeHtml(name)},</p><p>Thanks for registering.</p>`,
       });
-      console.log('Confirmation email sent to', to);
     } catch (err) {
-      console.error('Failed to send email:', err);
+      console.error("Failed to send email:", err);
     }
   }
 
-  await saveSubmission(submission);
+  try {
+    await saveSubmission(submission);
+  } catch (err) {
+    return res.status(500).send("Failed to save registration data.");
+  }
+
   sendConfirmationEmail(submission.email, submission.fullname);
 
   const profilePicHtml = req.file
     ? `
       <p><strong>Uploaded File:</strong> ${escapeHtml(req.file.originalname)}</p>
-      <img src="/uploads/${escapeHtml(req.file.filename)}" alt="Profile Picture" style="max-width: 220px; border-radius: 8px; display:block; margin-top:12px;" />
+      <p style="color:#666; font-size: 13px;">Uploaded image is stored securely and is not publicly exposed.</p>
     `
     : "<p>No profile picture uploaded.</p>";
 
@@ -202,6 +236,20 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
+app.get("/uploads/:filename", adminAuth, (req, res) => {
+  const safeName = path.basename(req.params.filename);
+  const filePath = path.join(uploadDir, safeName);
+  if (!filePath.startsWith(uploadDir)) {
+    return res.status(400).send("Invalid file path.");
+  }
+
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      res.status(404).send("File not found.");
+    }
+  });
+});
+
 // Simple admin protection: require ADMIN_USER and ADMIN_PASS env vars to enable basic auth
 function adminAuth(req, res, next) {
   const adminUser = process.env.ADMIN_USER;
@@ -210,36 +258,36 @@ function adminAuth(req, res, next) {
 
   const auth = req.headers.authorization;
   if (!auth) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
-    return res.status(401).send('Authentication required');
+    res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+    return res.status(401).send("Authentication required");
   }
-  const parts = auth.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Basic') return res.status(400).send('Bad auth');
-  const buff = Buffer.from(parts[1], 'base64');
-  const [user, pass] = buff.toString().split(':');
+  const parts = auth.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Basic") return res.status(400).send("Bad auth");
+  const buff = Buffer.from(parts[1], "base64");
+  const [user, pass] = buff.toString().split(":");
   if (user === adminUser && pass === adminPass) return next();
-  res.setHeader('WWW-Authenticate', 'Basic realm="Admin"');
-  return res.status(403).send('Forbidden');
+  res.setHeader("WWW-Authenticate", 'Basic realm="Admin"');
+  return res.status(403).send("Forbidden");
 }
 
-app.get('/admin', adminAuth, async (req, res) => {
-  const file = path.join(__dirname, 'submissions.json');
+app.get("/admin", adminAuth, async (req, res) => {
+  const file = path.join(__dirname, "submissions.json");
   try {
-    const raw = await fsPromises.readFile(file, 'utf8');
-    const list = JSON.parse(raw || '[]');
-    const rows = list.map(s => `
+    const raw = await fsPromises.readFile(file, "utf8");
+    const list = JSON.parse(raw || "[]");
+    const rows = list.map((s) => `
       <tr>
         <td>${escapeHtml(String(s.id))}</td>
-        <td>${escapeHtml(s.fullname || '')}</td>
-        <td>${escapeHtml(s.email || '')}</td>
-        <td>${escapeHtml(String(s.age || ''))}</td>
-        <td>${escapeHtml(s.gender || '')}</td>
-        <td>${escapeHtml(s.department || '')}</td>
-        <td>${escapeHtml((s.hobbies || []).join(', '))}</td>
-        <td>${s.profilePic ? `<a href="/uploads/${escapeHtml(s.profilePic)}" target="_blank">view</a>` : '—'}</td>
-        <td>${escapeHtml(s.createdAt || '')}</td>
+        <td>${escapeHtml(s.fullname || "")}</td>
+        <td>${escapeHtml(s.email || "")}</td>
+        <td>${escapeHtml(String(s.age || ""))}</td>
+        <td>${escapeHtml(s.gender || "")}</td>
+        <td>${escapeHtml(s.department || "")}</td>
+        <td>${escapeHtml((s.hobbies || []).join(", "))}</td>
+        <td>${s.profilePic ? `<a href="/uploads/${escapeHtml(s.profilePic)}" target="_blank">view</a>` : "—"}</td>
+        <td>${escapeHtml(s.createdAt || "")}</td>
       </tr>
-    `).join('');
+    `).join("");
 
     res.send(`
       <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: 20px auto;">
@@ -252,7 +300,7 @@ app.get('/admin', adminAuth, async (req, res) => {
       </div>
     `);
   } catch (e) {
-    return res.status(500).send('Failed to read submissions');
+    return res.status(500).send("Failed to read submissions");
   }
 });
 
